@@ -7,21 +7,21 @@ on:
 
 jobs:
   sonarQubeScan:
-  name: SonarQube Scan
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up SonarQube Scanner
-      uses: sonarsource/sonarcloud-github-action@v1
-      with:
-        projectBaseDir: .  
+      - name: Set up SonarQube Scanner
+        uses: sonarsource/sonarcloud-github-action@v1
+        with:
+          projectBaseDir: .  # Define the project directory if needed
 
-    - name: Run SonarQube scan
-      run: |
-        export SONAR_TOKEN=${{ secrets.SONARQUBE_TOKEN }}
-        sonar-scanner
+      - name: Run SonarQube scan
+        run: |
+          export SONAR_TOKEN=${{ secrets.SONARQUBE_TOKEN }}
+          sonar-scanner
 
 
   trivyScan:
