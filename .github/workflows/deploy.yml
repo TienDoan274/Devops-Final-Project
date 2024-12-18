@@ -1,0 +1,97 @@
+name: Deploy to AWS EKS with SonarQube and Trivy Scanning
+
+on:
+  push:
+    branches:
+      - main  # Trigger when there is a commit to the main branch
+
+jobs:
+  sonarQubeScan:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SonarQube Scanner
+        uses: sonarsource/sonarcloud-github-action@v1
+        with:
+          sonar-token: ${{ secrets.SONARQUBE_TOKEN }}
+
+      - name: Run SonarQube scan
+        run: sonar-scanner
+
+  trivyScan:
+    name: Trivy Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: sonarQubeScan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
+
+      - name: Build Docker images
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
+
+      - name: Run Trivy scan on Docker images
+        run: |
+          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
+          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
+          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
+
+  deployToEKS:
+    name: Deploy to AWS EKS
+    runs-on: ubuntu-latest
+    needs: trivyScan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v1
+        with:
+          version: 'v1.21.0'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
+
+      - name: Login to Docker Hub
+        run: |
+          echo ${{ secrets.DOCKER_USERNAME }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: Push Docker images to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest 
+
+      - name: Deploy to EKS using kubectl
+        run: |
+          kubectl apply -f ./k8s
+
+          kubectl set image deployment/frontend frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          kubectl set image deployment/order-api order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
+          kubectl set image deployment/product-api product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
+          kubectl set image deployment/user-api user-api=${{ secrets.DOCKER_USERNAME }}/user:latest
