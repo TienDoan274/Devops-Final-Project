@@ -40,6 +40,10 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
+      - name: Login to Docker Hub
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
       - name: Push Docker images to Docker Hub
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
@@ -77,10 +81,7 @@ jobs:
         run: |
           aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
 
-      - name: Login to Docker Hub
-        run: |
-          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-
+      
       
 
       - name: Deploy to EKS using kubectl
