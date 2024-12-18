@@ -13,16 +13,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up SonarQube Scanner
-        uses: sonarsource/sonarcloud-github-action@v1
+      - name: Set up JDK
+        uses: actions/setup-java@v3
         with:
-          projectBaseDir: .  # Define the project directory if needed
+          java-version: '11'
+          distribution: 'adopt'
+
+      - name: Install SonarQube Scanner
+        run: |
+          wget https://repo1.maven.org/maven2/org/sonarsource/scanner/cli/sonar-scanner-cli/4.7.0.2747/sonar-scanner-cli-4.7.0.2747.zip
+          unzip sonar-scanner-cli-4.7.0.2747.zip
+          echo "$GITHUB_WORKSPACE/sonar-scanner-4.7.0.2747/bin" >> $GITHUB_PATH
 
       - name: Run SonarQube scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONAR_HOST_URL: http://localhost:9000  # Your local SonarQube instance
         run: |
-          export SONAR_TOKEN=${{ secrets.SONARQUBE_TOKEN }}
-          sonar-scanner
-
+          sonar-scanner \
+            -Dsonar.projectKey=your-project-key \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.login=$SONAR_TOKEN
 
   trivyScan:
     name: Trivy Scan Docker Image
