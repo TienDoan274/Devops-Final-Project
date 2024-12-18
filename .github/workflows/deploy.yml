@@ -19,6 +19,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
   trivyScan:
     name: Trivy Scan Docker Image
+    needs: sonarqube
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
