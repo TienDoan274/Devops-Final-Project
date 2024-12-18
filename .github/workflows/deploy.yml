@@ -6,36 +6,17 @@ on:
       - main  # Trigger when there is a commit to the main branch
 
 jobs:
-  sonarQubeScan:
-    name: SonarQube Scan
+  sonarqube:
+    name: SonarQube
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up JDK
-        uses: actions/setup-java@v3
+      - uses: actions/checkout@v3
         with:
-          java-version: '11'
-          distribution: 'adopt'
-
-      - name: Install SonarQube Scanner
-        run: |
-          wget https://repo1.maven.org/maven2/org/sonarsource/scanner/cli/sonar-scanner-cli/4.7.0.2747/sonar-scanner-cli-4.7.0.2747.zip
-          unzip sonar-scanner-cli-4.7.0.2747.zip
-          echo "$GITHUB_WORKSPACE/sonar-scanner-4.7.0.2747/bin" >> $GITHUB_PATH
-
-      - name: Run SonarQube scan
-        env:
+          fetch-depth: 0  
+      - name: SonarQubeScan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-          SONAR_HOST_URL: http://localhost:9000  # Your local SonarQube instance
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=your-project-key \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_TOKEN
-
   trivyScan:
     name: Trivy Scan Docker Image
     runs-on: ubuntu-latest
