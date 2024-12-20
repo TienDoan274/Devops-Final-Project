@@ -81,9 +81,6 @@ jobs:
         run: |
           aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
 
-      
-      
-
       - name: Deploy to EKS using kubectl
         run: |
           kubectl apply -f ./kubernetes2
