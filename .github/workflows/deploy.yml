@@ -83,7 +83,7 @@ jobs:
 
       - name: Deploy to EKS using kubectl
         run: |
-          kubectl apply -f ./kubernetes2
+          kubectl apply -f ./kubernetes
       
           kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
           kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest

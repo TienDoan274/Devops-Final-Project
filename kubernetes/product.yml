@@ -33,6 +33,7 @@ kind: Service
 metadata:
   name: cproduct-service
 spec:
+  type: LoadBalancer  
   selector:
     app: product-api
   ports:
