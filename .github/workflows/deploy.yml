@@ -1,51 +1,36 @@
-name: Deploy to AWS EKS with Security Scanning
+name: Deploy to AWS EKS with SonarQube and Trivy Scanning
+
 on:
   push:
     branches:
-      - main
+      - main  # Trigger when there is a commit to the main branch
 
 jobs:
-  security-scan:
-    name: Security Scanning
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  
+      - name: SonarQubeScan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env: 
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+
+  trivyScan:
+    name: Trivy Security Scanning
+    needs: sonarqube
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v3
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4
-        env:
-          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
-
-      - name: OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'My Project'
-          path: '.'
-          format: 'HTML'
-          out: 'reports'
-          args: >
-            --failOnCVSS 7
-            --enableRetired
-            --scan "requirements.txt"
-
-      - name: Upload Dependency Check Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: dependency-check-report
-          path: reports
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
 
       - name: Install Trivy
         run: |
-          sudo apt-get update
           sudo apt-get install -y wget apt-transport-https gnupg lsb-release
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
           echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
@@ -59,42 +44,12 @@ jobs:
           trivy fs --exit-code 1 --severity HIGH,CRITICAL --security-checks vuln,config,secret ./user-service
           trivy fs --exit-code 1 --severity HIGH,CRITICAL --security-checks vuln,config,secret ./product-service
 
-      - name: Upload Trivy filesystem scan results
-        uses: actions/upload-artifact@v3
-        with:
-          name: trivy-fs-results
-          path: trivy-results.txt
-
-  build-and-scan:
-    name: Build and Scan Docker Images
-    needs: security-scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
-
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
       - name: Build Docker images
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
           docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
-
-      - name: Login to Docker Hub
-        run: |
-          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
       - name: Run Trivy vulnerability scan on images
         run: |
@@ -103,34 +58,32 @@ jobs:
           trivy image --exit-code 1 --severity HIGH,CRITICAL --no-progress ${{ secrets.DOCKER_USERNAME }}/user:latest
           trivy image --exit-code 1 --severity HIGH,CRITICAL --no-progress ${{ secrets.DOCKER_USERNAME }}/product:latest
 
-      - name: Upload Trivy image scan results
-        uses: actions/upload-artifact@v3
-        with:
-          name: trivy-image-results
-          path: trivy-results.txt
+      - name: Login to Docker Hub
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-      - name: Push Docker images
+      - name: Push Docker images to Docker Hub
         if: success()
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest 
 
-  deploy:
+  deployToEKS:
     name: Deploy to AWS EKS
-    needs: build-and-scan
     runs-on: ubuntu-latest
+    needs: trivyScan
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
+      - name: Set up AWS CLI
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: us-east-1  
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v1
@@ -139,11 +92,12 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name my-cluster-name
+          aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
 
-      - name: Deploy to EKS
+      - name: Deploy to EKS using kubectl
         run: |
           kubectl apply -f ./kubernetes
+          
           kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
           kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
           kubectl set image deployment/product-api-deployment product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
