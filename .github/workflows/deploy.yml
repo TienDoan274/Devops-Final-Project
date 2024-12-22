@@ -17,8 +17,9 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v4
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+
   trivyScan:
-    name: Trivy Scan Docker Image
+    name: Trivy Scan Docker Image and Files
     needs: sonarqube
     runs-on: ubuntu-latest
     steps:
@@ -33,27 +34,38 @@ jobs:
           sudo apt-get install -y wget
           wget https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-64bit.deb
           sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
+
+      - name: Run Trivy scan on files
+        run: |
+          # Scan the entire repository for vulnerabilities (i.e., files)
+          trivy fs --severity CRITICAL .
+
       - name: Build Docker images
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
           docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
           docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
+
       - name: Login to Docker Hub
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
       - name: Push Docker images to Docker Hub
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
           docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
           docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
+
       - name: Run Trivy scan on Docker images
         run: |
+          # Scan the Docker images for vulnerabilities
           trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
           trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
           trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
           trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
+
   deployToEKS:
     name: Deploy to AWS EKS
     runs-on: ubuntu-latest
@@ -77,10 +89,10 @@ jobs:
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
+
       - name: Deploy to EKS using kubectl
         run: |
           kubectl apply -f ./kubernetes
-      
           kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
           kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
           kubectl set image deployment/product-api-deployment product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
