@@ -7,13 +7,28 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
+      evaluation_interval: 15s
+
     scrape_configs:
       - job_name: 'prometheus'
         static_configs:
           - targets: ['localhost:9090']
-      - job_name: 'kubernetes'
-        kubernetes_sd_configs:
-          - role: endpoints
+
+      - job_name: 'user-api'
+        static_configs:
+          - targets: ['user-api:5001']
+      
+      - job_name: 'product-api'
+        static_configs:
+          - targets: ['product-api:5002']
+      
+      - job_name: 'order-api'
+        static_configs:
+          - targets: ['order-api:5003']
+      
+      - job_name: 'frontend-app'
+        static_configs:
+          - targets: ['frontend:5000']
 ---
 # prometheus-deployment.yaml
 apiVersion: apps/v1
