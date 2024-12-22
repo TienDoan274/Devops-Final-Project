@@ -38,11 +38,11 @@ jobs:
           sudo apt-get install -y trivy
 
       - name: Run Trivy filesystem scan
-          run: |
-            trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./frontend
-            trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./order-service
-            trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./user-service
-            trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./product-service
+        run: |
+          trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./frontend
+          trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./order-service
+          trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./user-service
+          trivy fs --exit-code 1 --severity CRITICAL --security-checks vuln ./product-service
 
       - name: Build Docker images
         run: |
