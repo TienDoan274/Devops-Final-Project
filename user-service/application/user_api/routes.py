@@ -1,17 +1,65 @@
-# application/user_api/routes.py
 from . import user_api_blueprint
 from .. import db, login_manager
 from ..models import User
 from flask import make_response, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
-
 from passlib.hash import sha256_crypt
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+import time
 
+# Define metrics
+REQUEST_COUNT = Counter(
+    'user_api_request_count', 
+    'App Request Count',
+    ['method', 'endpoint', 'status']
+)
+
+REQUEST_LATENCY = Histogram(
+    'user_api_request_latency_seconds', 
+    'Request latency in seconds',
+    ['method', 'endpoint']
+)
+
+LOGIN_ATTEMPTS = Counter(
+    'user_api_login_attempts_total',
+    'Total login attempts',
+    ['status']  # success or failure
+)
+
+USER_COUNT = Counter(
+    'user_api_users_created_total',
+    'Total number of users created'
+)
+
+# Middleware to track request metrics
+@user_api_blueprint.before_request
+def before_request():
+    request.start_time = time.time()
+
+@user_api_blueprint.after_request
+def after_request(response):
+    if request.path != '/metrics':
+        latency = time.time() - request.start_time
+        REQUEST_LATENCY.labels(
+            method=request.method,
+            endpoint=request.path
+        ).observe(latency)
+        
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.path,
+            status=response.status_code
+        ).inc()
+    return response
+
+# Metrics endpoint
+@user_api_blueprint.route('/metrics')
+def metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.filter_by(id=user_id).first()
-
 
 @login_manager.request_loader
 def load_user_from_request(request):
@@ -23,13 +71,12 @@ def load_user_from_request(request):
             return user
     return None
 
-
 @user_api_blueprint.route('/api/users', methods=['GET'])
 def get_users():
     data = []
     for row in User.query.all():
         data.append(row.to_json())
-
+    
     response = jsonify(data)
     return response
 
@@ -39,9 +86,9 @@ def post_register():
     last_name = request.form['last_name']
     email = request.form['email']
     username = request.form['username']
-
+    
     password = sha256_crypt.hash((str(request.form['password'])))
-
+    
     user = User()
     user.email = email
     user.first_name = first_name
@@ -49,14 +96,14 @@ def post_register():
     user.password = password
     user.username = username
     user.authenticated = True
-
+    
     db.session.add(user)
     db.session.commit()
-
-    response = jsonify({'message': 'User added', 'result': user.to_json()})
-
+    
+    USER_COUNT.inc()  # Increment user creation counter
+    
+    response = jsonify({'message': 'User added!', 'result': user.to_json()})
     return response
-
 
 @user_api_blueprint.route('/api/user/login', methods=['POST'])
 def post_login():
@@ -67,11 +114,12 @@ def post_login():
             user.encode_api_key()
             db.session.commit()
             login_user(user)
-
+            
+            LOGIN_ATTEMPTS.labels(status='success').inc()
             return make_response(jsonify({'message': 'Logged in', 'api_key': user.api_key}))
-
+    
+    LOGIN_ATTEMPTS.labels(status='failure').inc()
     return make_response(jsonify({'message': 'Not logged in'}), 401)
-
 
 @user_api_blueprint.route('/api/user/logout', methods=['POST'])
 def post_logout():
@@ -79,7 +127,6 @@ def post_logout():
         logout_user()
         return make_response(jsonify({'message': 'You are logged out'}))
     return make_response(jsonify({'message': 'You are not logged in'}))
-
 
 @user_api_blueprint.route('/api/user/<username>/exists', methods=['GET'])
 def get_username(username):
@@ -90,11 +137,10 @@ def get_username(username):
         response = jsonify({'message': 'Cannot find username'}), 404
     return response
 
-
 @login_required
 @user_api_blueprint.route('/api/user', methods=['GET'])
 def get_user():
     if current_user.is_authenticated:
         return make_response(jsonify({'result': current_user.to_json()}))
-
+    
     return make_response(jsonify({'message': 'Not logged in'})), 401

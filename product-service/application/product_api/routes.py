@@ -43,3 +43,4 @@ def product(slug):
     else:
         response = jsonify({'message': 'Cannot find product'}), 404
     return response
+

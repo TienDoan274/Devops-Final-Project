@@ -3,12 +3,17 @@ import config
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from prometheus_flask_exporter import PrometheusMetrics
 
 db = SQLAlchemy()
 
 
 def create_app():
     app = Flask(__name__)
+    metrics = PrometheusMetrics(app)
+
+    metrics.info(f'order_info', f'order API info', version='1.0.0')
+
     environment_configuration = os.environ['CONFIGURATION_SETUP']
     app.config.from_object(environment_configuration)
 
