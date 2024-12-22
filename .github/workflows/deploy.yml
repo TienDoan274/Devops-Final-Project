@@ -40,41 +40,41 @@ jobs:
           trivy fs --severity HIGH,CRITICAL ./product-service
 
   dependencyCheck:
-  name: OWASP Dependency Check
-  needs: trivyFileScan
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    name: OWASP Dependency Check
+    needs: trivyFileScan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin' 
-        java-version: '17'
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin' 
+          java-version: '17'
 
-    - name: Create reports directory
-      run: mkdir -p reports
+      - name: Create reports directory
+        run: mkdir -p reports
 
-    - name: Run OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      env:
-        JAVA_HOME: /opt/java/openjdk
-      with:
-        project: 'My Project'
-        path: '.'
-        format: 'HTML'
-        out: 'reports'
-        args: >
-          --failOnCVSS 7
-          --enableRetired
-          --noupdate
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: /opt/java/openjdk
+        with:
+          project: 'My Project'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+            --noupdate
 
-    - name: Upload dependency check report
-      uses: actions/upload-artifact@v3
-      with:
-        name: dependency-check-report
-        path: ${{ github.workspace }}/reports
+      - name: Upload dependency check report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: ${{ github.workspace }}/reports
 
   buildAndPush:
     name: Build and Push Docker Images
