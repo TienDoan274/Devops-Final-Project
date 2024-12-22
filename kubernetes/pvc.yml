@@ -4,7 +4,7 @@ metadata:
   name: user-db-pvc
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteOnce 
   storageClassName: ebs-sc
   resources:
     requests:

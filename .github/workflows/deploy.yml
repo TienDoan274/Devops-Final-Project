@@ -53,6 +53,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Get JAVA_HOME
+        id: get-java-home
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         env:
@@ -61,10 +66,11 @@ jobs:
           project: 'My Project'
           path: '.'
           format: 'HTML'
-          out: 'reports' 
+          out: 'reports'
           args: >
             --failOnCVSS 7
             --enableRetired
+            --noupdate
 
       - name: Upload dependency check report
         uses: actions/upload-artifact@v3
