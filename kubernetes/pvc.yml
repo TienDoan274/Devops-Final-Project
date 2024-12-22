@@ -44,7 +44,7 @@ spec:
   storageClassName: ebs-sc
   resources:
     requests:
-      storage: 512Mi
+      storage: 10Gi     # Keeping the existing size
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -56,4 +56,4 @@ spec:
   storageClassName: ebs-sc
   resources:
     requests:
-      storage: 512Mi
+      storage: 10Gi     # Matching the existing size
