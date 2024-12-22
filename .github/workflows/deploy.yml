@@ -24,24 +24,26 @@ jobs:
         with:
           java-version: '11'
           distribution: 'temurin'
+          cache: 'maven'
 
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME }}
         with:
           project: 'My Project'
           path: '.'
           format: 'HTML'
+          out: 'reports'
           args: >
             --failOnCVSS 7
             --enableRetired
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_11_X64 }}
 
       - name: Upload Dependency Check Report
         uses: actions/upload-artifact@v3
         with:
           name: dependency-check-report
-          path: ${{ github.workspace }}/reports
+          path: reports
 
       - name: Install Trivy
         run: |
