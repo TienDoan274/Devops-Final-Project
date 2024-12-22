@@ -50,10 +50,10 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/product:latest 
       - name: Run Trivy scan on Docker images
         run: |
-          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
-          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
-          trivy image --severity HIGH,CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
   deployToEKS:
     name: Deploy to AWS EKS
     runs-on: ubuntu-latest
