@@ -16,20 +16,20 @@ data:
 
       - job_name: 'user-api'
         static_configs:
-          - targets: ['user-api:5001']
+          - targets: ['cuser-service:5001']
         metrics_path: '/metrics'
       
       - job_name: 'product-api'
         static_configs:
-          - targets: ['product-api:5002']
+          - targets: ['cproduct-service:5002']
       
       - job_name: 'order-api'
         static_configs:
-          - targets: ['order-api:5003']
+          - targets: ['corder-service:5003']
       
       - job_name: 'frontend-app'
         static_configs:
-          - targets: ['frontend:5000']
+          - targets: ['frontend-service:5000']
 ---
 # prometheus-deployment.yaml
 apiVersion: apps/v1
