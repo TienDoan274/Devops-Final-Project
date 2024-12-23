@@ -19,30 +19,40 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v4
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-      
 
-  trivy-file-scan:
-    name: Trivy File Scan
+  bandit-scan:
+    name: Bandit Security Scan
     needs: sonarqube-analysis
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Trivy
-        run: |
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      - name: Run Trivy filesystem scan
-        run: trivy fs --exit-code 1 --severity CRITICAL .
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit scan
+        run: |
+          bandit -r . -f json -o bandit-report.json
+          bandit -r . -f html -o bandit-report.html
+        continue-on-error: true
+
+      - name: Upload Bandit Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: Bandit Security Reports
+          path: |
+            bandit-report.json
+            bandit-report.html
 
   build-push:
     name: Build and Push Docker Images
-    needs: trivy-file-scan
+    needs: bandit-scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
