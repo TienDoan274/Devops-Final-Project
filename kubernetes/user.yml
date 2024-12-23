@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: user-api
-        image: tiendn274/user:latest
+        image: tiendn274/user:${TAG}
         imagePullPolicy: Always
         ports:
         - containerPort: 5001

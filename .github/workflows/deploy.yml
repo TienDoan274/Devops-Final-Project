@@ -4,23 +4,19 @@ on:
   push:
     branches:
       - main
-
+env:
+  TAG: ${GITHUB_SHA::7}-$(date +'%Y%m%d-%H%M%S')
 jobs:
   sonarqube:
     name: SonarQube
     runs-on: ubuntu-latest
-    outputs:
-      timestamp: ${{ steps.set-timestamp.outputs.timestamp }}
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-      - name: Set timestamp
-        id: set-timestamp
-        run: echo "timestamp=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+          fetch-depth: 0  
       - name: SonarQubeScan
         uses: SonarSource/sonarqube-scan-action@v4
-        env:
+        env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
 
   trivyFileScan:
@@ -40,32 +36,28 @@ jobs:
 
   dockerBuildPush:
     name: Build and Push Docker Images
-    needs: trivyFileScan
+    needs: sonarqube
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker images
-        env:
-          TAG: ${{ needs.sonarqube.outputs.timestamp }}
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:$TAG ./frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:$TAG ./order-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:$TAG ./user-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:$TAG ./product-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:${TAG} ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:${TAG} ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:${TAG} ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:${TAG} ./product-service
       - name: Login to Docker Hub
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
       - name: Push Docker images
-        env:
-          TAG: ${{ needs.sonarqube.outputs.timestamp }}
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:$TAG
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:$TAG
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:$TAG
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:$TAG
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:${TAG}
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:${TAG}
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:${TAG}
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:${TAG}
 
   trivyImageScan:
     name: Trivy Scan Docker Images
-    needs: [dockerBuildPush, sonarqube]
+    needs: dockerBuildPush
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -75,17 +67,15 @@ jobs:
           wget https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-64bit.deb
           sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
       - name: Scan Docker images
-        env:
-          TAG: ${{ needs.sonarqube.outputs.timestamp }}
         run: |
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:$TAG
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:$TAG
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:$TAG
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:$TAG
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
 
   deployToEKS:
     name: Deploy to AWS EKS
-    needs: [trivyImageScan, sonarqube]
+    needs: trivyImageScan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -99,15 +89,18 @@ jobs:
           version: 'v1.21.0'
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name my-cluster-name
-      - name: Update Kubernetes manifests with new tag
-        env:
-          TAG: ${{ needs.sonarqube.outputs.timestamp }}
+      - name: Create env file
         run: |
-          # Use sed to update image tags in kubernetes manifests
-          find ./kubernetes -type f -name "*.yaml" -exec sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/frontend:.*|image: ${{ secrets.DOCKER_USERNAME }}/frontend:$TAG|g" {} +
-          find ./kubernetes -type f -name "*.yaml" -exec sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/order:.*|image: ${{ secrets.DOCKER_USERNAME }}/order:$TAG|g" {} +
-          find ./kubernetes -type f -name "*.yaml" -exec sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/product:.*|image: ${{ secrets.DOCKER_USERNAME }}/product:$TAG|g" {} +
-          find ./kubernetes -type f -name "*.yaml" -exec sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/user:.*|image: ${{ secrets.DOCKER_USERNAME }}/user:$TAG|g" {} +
+          echo "TAG=${TAG}" > kubernetes/deployment.env
       - name: Deploy to EKS
         run: |
-          kubectl apply -f ./kubernetes
+          # Export biến môi trường từ file
+          export $(cat kubernetes/deployment.env | xargs)
+          
+          # Thay thế biến môi trường trong manifest files
+          for file in kubernetes/*-deployment.yaml; do
+            envsubst < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+          done
+          
+          # Apply manifests
+          kubectl apply -f kubernetes/
