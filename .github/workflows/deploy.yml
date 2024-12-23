@@ -68,10 +68,10 @@ jobs:
           sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
       - name: Scan Docker images
         run: |
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:${TAG}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:${TAG}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:${TAG}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:${TAG}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:${{TAG}}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:${{TAG}}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:${{TAG}}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:${{TAG}}
 
   deployToEKS:
     name: Deploy to AWS EKS
