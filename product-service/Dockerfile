@@ -15,7 +15,7 @@ COPY . .
 RUN echo '#!/bin/bash\n\
 # Wait for database to be ready\n\
 echo "Waiting for database..."\n\
-sleep 7\n\
+sleep 8\n\
 \n\
 # Initialize database if not already done\n\
 if [ ! -d "/productapp/migrations" ]; then\n\
