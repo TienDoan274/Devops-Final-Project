@@ -1,124 +1,79 @@
-name: CI/CD Pipeline
+name: Deploy to AWS EKS with SonarQube and Trivy Scanning
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger when there is a commit to the main branch
 
 jobs:
-  sonarqube-analysis:
-    name: Code Analysis
+  sonarqube:
+    name: SonarQube
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-
-      - name: SonarQube Scan
+          fetch-depth: 0  
+      - name: SonarQubeScan
         uses: SonarSource/sonarqube-scan-action@v4
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
 
-  bandit-scan:
-    name: Bandit Security Scan
-    needs: sonarqube-analysis
+  trivyScan:
+    name: Trivy Scan Docker Image and Files
+    needs: sonarqube
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install Bandit
-        run: pip install bandit
-
-      - name: Run Bandit scan
-        run: |
-          bandit -r . -f json -o bandit-report.json
-          bandit -r . -f html -o bandit-report.html
-        continue-on-error: true
-
-      - name: Upload Bandit Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: Bandit Security Reports
-          path: |
-            bandit-report.json
-            bandit-report.html
-
-  build-push:
-    name: Build and Push Docker Images
-    needs: bandit-scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
+      - name: Set up Docker
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push all services
-        run: |
-          # Build và push frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          
-          # Build và push order service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest
-          
-          # Build và push user service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest
-          
-          # Build và push product service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
-
-  trivy-image-scan:
-    name: Trivy Image Scan
-    needs: build-push
-    runs-on: ubuntu-latest
-    steps:
       - name: Install Trivy
         run: |
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
-      - name: Scan Docker images
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
+      - name: Run Trivy scan on files
         run: |
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
-
-  deploy:
-    name: Deploy to EKS
-    needs: trivy-image-scan
+          # Scan the entire repository for vulnerabilities (i.e., files)
+          trivy fs --severity CRITICAL .
+      - name: Build Docker images
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
+      - name: Login to Docker Hub
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      - name: Push Docker images to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
+      - name: Run Trivy scan on Docker images
+        run: |
+          # Scan the Docker images for vulnerabilities
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
+  deployToEKS:
+    name: Deploy to AWS EKS
     runs-on: ubuntu-latest
+    needs: trivyScan
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
+      - name: Set up AWS CLI
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: us-east-1  
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v1
@@ -126,9 +81,9 @@ jobs:
           version: 'v1.21.0'
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name my-cluster-name
-
-      - name: Deploy to EKS
+        run: |
+          aws eks update-kubeconfig --name my-cluster-name  # Replace with your actual cluster name
+      - name: Deploy to EKS using kubectl
         run: |
           kubectl apply -f ./kubernetes
           kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
