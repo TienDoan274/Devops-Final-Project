@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-env:
-  TAG: ${GITHUB_SHA::7}-$(date +'%Y%m%d-%H%M%S')
+
 jobs:
   sonarqube:
     name: SonarQube
@@ -42,18 +41,18 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build Docker images
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:${TAG} ./frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:${TAG} ./order-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:${TAG} ./user-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:${TAG} ./product-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
       - name: Login to Docker Hub
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
       - name: Push Docker images
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:${TAG}
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:${TAG}
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:${TAG}
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:${TAG}
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
 
   trivyImageScan:
     name: Trivy Scan Docker Images
@@ -89,16 +88,10 @@ jobs:
           version: 'v1.21.0'
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name my-cluster-name
-      - name: Create env file
-        run: |
-          echo "TAG=${TAG}" > kubernetes/deployment.env
       - name: Deploy to EKS
         run: |
-          export $(cat kubernetes/deployment.env | xargs)
-          
-          for file in kubernetes/*.yml; do
-            envsubst < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
-          done
-          
-          # Apply manifests
-          kubectl apply -f kubernetes/
+          kubectl apply -f ./kubernetes
+          kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
+          kubectl set image deployment/product-api-deployment product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
+          kubectl set image deployment/user-api-deployment user-api=${{ secrets.DOCKER_USERNAME }}/user:latest
