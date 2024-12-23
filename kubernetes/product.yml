@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: product-api
-        image: tiendn274/product:${TAG}
+        image: tiendn274/product:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5002
