@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  code-analysis:
+  sonarqube-analysis:
     name: Code Analysis
     runs-on: ubuntu-latest
     steps:
@@ -19,28 +19,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v4
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME }}
-        with:
-          project: 'Microservices'
-          path: '.'
-          format: 'HTML'
-          args: >
-            --enableRetired
-            --scan .
-
-      - name: Upload OWASP Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: OWASP Dependency Check Report
-          path: ${{ github.workspace }}/reports
+      
 
   trivy-file-scan:
     name: Trivy File Scan
