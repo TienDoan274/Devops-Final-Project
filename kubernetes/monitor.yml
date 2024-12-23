@@ -68,11 +68,11 @@ spec:
           mountPath: /prometheus
         resources:
           requests:
-            cpu: 100m    # 0.1 core CPU
-            memory: 128Mi
-          limits:
-            cpu: 200m    # 0.2 core CPU  
+            cpu: 200m    # 0.1 core CPU
             memory: 256Mi
+          limits:
+            cpu: 300m    # 0.2 core CPU  
+            memory: 400Mi
       volumes:
       - name: config-volume
         configMap:
@@ -129,11 +129,11 @@ spec:
           mountPath: /var/lib/grafana
         resources:
           requests:
-            cpu: 100m    # 0.1 core CPU
-            memory: 128Mi
-          limits:
-            cpu: 200m    # 0.2 core CPU  
+            cpu: 200m    # 0.1 core CPU
             memory: 256Mi
+          limits:
+            cpu: 300m    # 0.2 core CPU  
+            memory: 400Mi
       volumes:
       - name: grafana-storage
         persistentVolumeClaim:
