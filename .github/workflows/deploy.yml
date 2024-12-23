@@ -19,7 +19,11 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v4
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         env:
