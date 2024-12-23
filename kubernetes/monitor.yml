@@ -71,8 +71,8 @@ spec:
             cpu: 200m    # 0.1 core CPU
             memory: 256Mi
           limits:
-            cpu: 300m    # 0.2 core CPU  
-            memory: 400Mi
+            cpu: 250m    # 0.2 core CPU  
+            memory: 320Mi
       volumes:
       - name: config-volume
         configMap:
@@ -132,8 +132,8 @@ spec:
             cpu: 200m    # 0.1 core CPU
             memory: 256Mi
           limits:
-            cpu: 300m    # 0.2 core CPU  
-            memory: 400Mi
+            cpu: 250m    # 0.2 core CPU  
+            memory: 320Mi
       volumes:
       - name: grafana-storage
         persistentVolumeClaim:

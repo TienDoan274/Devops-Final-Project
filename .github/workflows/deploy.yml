@@ -18,7 +18,7 @@ jobs:
         env: 
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
 
-  trivyScan:
+  trivyFileScan:
     name: Trivy Scan Docker Image and Files
     needs: sonarqube
     runs-on: ubuntu-latest
@@ -38,6 +38,9 @@ jobs:
         run: |
           # Scan the entire repository for vulnerabilities (i.e., files)
           trivy fs --severity CRITICAL .
+  dockerBuild&Push:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Build Docker images
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
@@ -53,6 +56,14 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
           docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
           docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
+  trivyImageScan:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
       - name: Run Trivy scan on Docker images
         run: |
           # Scan the Docker images for vulnerabilities
