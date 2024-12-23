@@ -4,9 +4,24 @@ from .. import db, login_manager
 from ..models import User
 from flask import make_response, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
-
+from prometheus_client import Counter
+from flask import current_app
 from passlib.hash import sha256_crypt
 
+USER_LOGIN_COUNT = Counter(
+    'user_login_total',
+    'Total number of user logins'
+)
+
+USER_REGISTRATION_COUNT = Counter(
+    'user_registration_total',
+    'Total number of user registrations'
+)
+
+USER_LOGOUT_COUNT = Counter(
+    'user_logout_total',
+    'Total number of user logouts'
+)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -52,7 +67,7 @@ def post_register():
 
     db.session.add(user)
     db.session.commit()
-
+    USER_REGISTRATION_COUNT.inc()
     response = jsonify({'message': 'User added', 'result': user.to_json()})
 
     return response
@@ -67,7 +82,7 @@ def post_login():
             user.encode_api_key()
             db.session.commit()
             login_user(user)
-
+            USER_LOGIN_COUNT.inc()
             return make_response(jsonify({'message': 'Logged in', 'api_key': user.api_key}))
 
     return make_response(jsonify({'message': 'Not logged in'}), 401)
@@ -77,6 +92,7 @@ def post_login():
 def post_logout():
     if current_user.is_authenticated:
         logout_user()
+        USER_LOGOUT_COUNT.inc()
         return make_response(jsonify({'message': 'You are logged out'}))
     return make_response(jsonify({'message': 'You are not logged in'}))
 
