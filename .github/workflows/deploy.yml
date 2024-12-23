@@ -91,4 +91,7 @@ jobs:
       - name: Deploy to EKS
         run: |
           kubectl apply -f ./kubernetes
-  
+          kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
+          kubectl set image deployment/product-api-deployment product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
+          kubectl set image deployment/user-api-deployment user-api=${{ secrets.DOCKER_USERNAME }}/user:latest
