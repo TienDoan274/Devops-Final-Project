@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: order-api
-        image: tiendn274/order:latest
+        image: ${DOCKER_USERNAME}/order:${TIMESTAMP}
         imagePullPolicy: Always
         ports:
         - containerPort: 5003

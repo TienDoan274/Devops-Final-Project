@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  TIMESTAMP: $(date +%Y%m%d-%H%M%S)
+
 jobs:
   sonarqube:
     name: SonarQube
@@ -39,20 +42,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set timestamp
+        run: echo "TIMESTAMP=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
       - name: Build Docker images
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:${{ env.TIMESTAMP }} ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:${{ env.TIMESTAMP }} ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:${{ env.TIMESTAMP }} ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:${{ env.TIMESTAMP }} ./product-service
       - name: Login to Docker Hub
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
       - name: Push Docker images
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:${{ env.TIMESTAMP }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:${{ env.TIMESTAMP }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:${{ env.TIMESTAMP }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:${{ env.TIMESTAMP }}
 
   trivyImageScan:
     name: Trivy Scan Docker Images
@@ -60,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set timestamp
+        run: echo "TIMESTAMP=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
       - name: Install Trivy
         run: |
           sudo apt-get install -y wget
@@ -67,10 +74,10 @@ jobs:
           sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
       - name: Scan Docker images
         run: |
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:${{ env.TIMESTAMP }}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:${{ env.TIMESTAMP }}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:${{ env.TIMESTAMP }}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:${{ env.TIMESTAMP }}
 
   deployToEKS:
     name: Deploy to AWS EKS
@@ -78,6 +85,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set timestamp
+        run: echo "TIMESTAMP=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
       - uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -88,10 +97,21 @@ jobs:
           version: 'v1.21.0'
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name my-cluster-name
+      - name: Prepare Kubernetes manifests
+        run: |
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          export TIMESTAMP=${{ env.TIMESTAMP }}
+          envsubst < kubernetes/frontend.yml > kubernetes/frontend-generated.yml
+          envsubst < kubernetes/order.yml > kubernetes/order-generated.yml
+          envsubst < kubernetes/user.yml > kubernetes/user-generated.yml
+          envsubst < kubernetes/product.yml > kubernetes/product-generated.yml
       - name: Deploy to EKS
         run: |
-          kubectl apply -f ./kubernetes
-          kubectl set image deployment/frontend-deployment frontend=${{ secrets.DOCKER_USERNAME }}/frontend:latest
-          kubectl set image deployment/order-api-deployment order-api=${{ secrets.DOCKER_USERNAME }}/order:latest
-          kubectl set image deployment/product-api-deployment product-api=${{ secrets.DOCKER_USERNAME }}/product:latest
-          kubectl set image deployment/user-api-deployment user-api=${{ secrets.DOCKER_USERNAME }}/user:latest
+          kubectl apply -f kubernetes/frontend-generated.yml
+          kubectl apply -f kubernetes/order-generated.yml
+          kubectl apply -f kubernetes/user-generated.yml
+          kubectl apply -f kubernetes/product-generated.yml
+          kubectl apply -f kubernetes/monitor.yml
+          kubectl apply -f kubernetes/pvc.yml
+          kubectl apply -f kubernetes/secret.yml
+          kubectl apply -f kubernetes/storage-class.yml

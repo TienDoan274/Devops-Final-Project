@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: tiendn274/frontend:latest
+        image: ${DOCKER_USERNAME}/frontend:${TIMESTAMP}
         imagePullPolicy: Always
         ports:
         - containerPort: 5000

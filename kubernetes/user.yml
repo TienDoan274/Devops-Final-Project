@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: user-api
-        image: tiendn274/user:latest
+        image: ${DOCKER_USERNAME}/user:${TIMESTAMP}
         imagePullPolicy: Always
         ports:
         - containerPort: 5001
