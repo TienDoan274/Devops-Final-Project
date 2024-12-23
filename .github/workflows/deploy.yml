@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-env:
-  TAG: ${GITHUB_SHA::7}-$(date +'%Y%m%d-%H%M%S')
+
 jobs:
   sonarqube:
     name: SonarQube
@@ -42,18 +41,18 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build Docker images
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:${{TAG}} ./frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:${{TAG}} ./order-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:${{TAG}} ./user-service
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:${{TAG}} ./product-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/order:latest ./order-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/user:latest ./user-service
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/product:latest ./product-service
       - name: Login to Docker Hub
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
       - name: Push Docker images
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:${{TAG}} 
-          docker push ${{ secrets.DOCKER_USERNAME }}/order:${{TAG}} 
-          docker push ${{ secrets.DOCKER_USERNAME }}/user:${{TAG}} 
-          docker push ${{ secrets.DOCKER_USERNAME }}/product:${{TAG}}
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/order:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/user:latest 
+          docker push ${{ secrets.DOCKER_USERNAME }}/product:latest
 
   trivyImageScan:
     name: Trivy Scan Docker Images
@@ -68,10 +67,10 @@ jobs:
           sudo dpkg -i trivy_0.22.0_Linux-64bit.deb
       - name: Scan Docker images
         run: |
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:${{TAG}}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:${{TAG}}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:${{TAG}}
-          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:${{TAG}}
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/order:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/user:latest
+          trivy image --severity CRITICAL ${{ secrets.DOCKER_USERNAME }}/product:latest
 
   deployToEKS:
     name: Deploy to AWS EKS
@@ -92,4 +91,4 @@ jobs:
       - name: Deploy to EKS
         run: |
           kubectl apply -f ./kubernetes
-          
+  
