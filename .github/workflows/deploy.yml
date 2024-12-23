@@ -36,7 +36,7 @@ jobs:
 
   dockerBuildPush:
     name: Build and Push Docker Images
-    needs: sonarqube
+    needs: trivyFileScan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -94,11 +94,9 @@ jobs:
           echo "TAG=${TAG}" > kubernetes/deployment.env
       - name: Deploy to EKS
         run: |
-          # Export biến môi trường từ file
           export $(cat kubernetes/deployment.env | xargs)
           
-          # Thay thế biến môi trường trong manifest files
-          for file in kubernetes/*-deployment.yaml; do
+          for file in kubernetes/*.yml; do
             envsubst < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
           done
           
